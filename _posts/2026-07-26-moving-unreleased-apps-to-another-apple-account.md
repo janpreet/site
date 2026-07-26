@@ -33,8 +33,9 @@ downstream that quietly assumed the old identity.
   `match nuke` is the wrong tool here and will delete your old material for no benefit.
 - **Do not trust "success"**. One lane reported that it applied the privacy policy URL, and it had
   silently skipped it. Read the store state back through the API.
-- **Verify the whole record, not the field you changed.** A later run of the same lane cleared a Kids
-  Category age band that had already been set and verified, while still reporting success.
+- **Verify the whole record, not the field you changed.** A run of the same lane cleared a Kids
+  Category age band that had already been set and verified, while still reporting success. The next
+  run put it back, which means what you ship depends on which run went last.
 - **A new bundle ID means a new UserDefaults domain.** Every user's saved progress is gone, and
   depending on your UI that can look exactly like you shipped an old build.
 
@@ -199,11 +200,26 @@ For a kids app that field is not cosmetic, it is the thing that puts you in the 
 had not stumbled onto it, the next thing to notice would have been an App Review rejection weeks
 later.
 
-Re-running the lane once more set it back, and this time I checked both fields together. I do not
-have a satisfying explanation for the mechanism, and I am wary of inventing one. What I take from it
-is narrower and more useful: **verify the whole record, not the diff you think you made.** Idempotent
-set-to-value automation can still clear a neighbouring field, and "I checked that field last time" is
-not the same as "that field is correct now".
+Re-running the lane once more set it back, and this time I checked both fields together.
+
+The obvious follow-up question is whether every future run will wipe it again, so I tested rather
+than guessed: two more runs of the same lane with no manifest change, checking after each. The band
+survived both. That fits the configuration, because the age rating file the lane uploads contains
+`"kidsAgeBand": "FIVE_AND_UNDER"`, so every run asserts the value rather than leaving it alone. The
+lane is self-healing.
+
+So it was a one-off rather than a standing behaviour. The only thing that distinguished the run that
+cleared it is that the privacy URL changed from one existing value to a different one, where the runs
+that preserved the band were either not touching the URL or setting it for the first time. That is a
+correlation from a handful of runs, not a mechanism, and I would rather leave it there than invent an
+explanation.
+
+What I take from it is narrower and more useful. Since a run can clear a field and the following run
+puts it back, the state you actually ship depends on which run went **last**. So verify after the
+final run of a batch, not after whichever run you happened to be watching. And more generally:
+**verify the whole record, not the diff you think you made.** Idempotent set-to-value automation can
+still disturb a neighbouring field, and "I checked that field last time" is not the same as "that
+field is correct now".
 
 ## Gotcha 6: `match` will not share a storage branch across teams
 
